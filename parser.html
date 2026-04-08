@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pilgrammed Asset Parser</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; background: #1f0b09; color: white; padding: 2rem; }
+        h1 { font-size: 2rem; border-bottom: 2px solid white; padding-bottom: 0.5rem; }
+        input[type="file"] { margin: 1rem 0; font-size: 1.2rem; }
+        pre { background: #0e0e0f; border: 2px solid white; padding: 1rem; border-radius: 5px; height: 300px; overflow-y: auto; color: #fff; }
+        button { background: #677148; color: white; border: 2px solid white; border-radius: 255px 10px 225px 10px/10px 225px 10px 255px; padding: 10px 20px; font-size: 1.2rem; cursor: pointer; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Pilgrammed Asset Parser</h1>
+    <p>Select your 3 downloaded HTML files (`accessories.html`, `armour.html`, `helmets.html`) below:</p>
+    
+    <input type="file" id="fileInput" multiple accept=".html">
+    <button id="parseBtn">Extract All Assets</button>
+
+    <h3>Generated JSON Data:</h3>
+    <pre id="output">Waiting for files...</pre>
+    <button id="copyBtn" style="display:none;" onclick="navigator.clipboard.writeText(document.getElementById('output').innerText); alert('Copied to clipboard!')">Copy Data</button>
+
+    <div id="progressContainer" style="display: none; margin-top: 1rem;">
+        <h3 id="progressText">Processing Items...</h3>
+        <div style="width: 100%; height: 20px; background: #3d3d5f; border: 2px solid white; border-radius: 10px; overflow: hidden;">
+            <div id="progressBar" style="width: 0%; height: 100%; background: #ffd700; transition: width 0.2s;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Ignore properties that are metadata and not game stats
+        const IGNORED_WIKI_KEYS = ['name', 'image', 'type', 'recipe', 'drop', 'cost', 'sell', 'source', 'rarity', 'title', 'category', 'obtained_from', 'mutual_exclusives', 'tier', 'level'];
+        function cleanImageUrl(url) {
+            if (!url) return '';
+            return url.split('/revision/')[0]; // Simpler, more robust way to get the original image
+        }
+
+        async function fetchWikiStats(itemName) {
+            try {
+                // Ensure correct exact capitalization encoding
+                const title = encodeURIComponent(itemName.trim().replace(/ /g, '_'));
+                const url = `https://pilgrammed-rblx.fandom.com/api.php?action=query&prop=revisions&rvprop=content&titles=${title}&redirects=1&format=json&origin=*`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                const pages = data.query.pages;
+                const pageId = Object.keys(pages)[0];
+                if (pageId === "-1") return null;
+                
+                const wikitext = pages[pageId].revisions[0]['*'];
+                
+                let stats = {};
+                const lines = wikitext.split('\n');
+                let inInfobox = false;
+                
+                lines.forEach(line => {
+                    const l = line.toLowerCase();
+                    if (l.includes('{{armor') || l.includes('{{accessory') || l.includes('{{equipment') || l.includes('{{weapon')) {
+                        inInfobox = true;
+                    }
+
+                    if (inInfobox && line.trim().startsWith('|')) {
+                        const parts = line.substring(1).split('=');
+                        if (parts.length >= 2) {
+                            // Clean Fandom underscores and common stat prefixes
+                            let key = parts[0].trim().toLowerCase().replace(/_/g, ' ');
+                            let valStr = parts.slice(1).join('=').trim();
+                            
+                            // Fix MediaWiki HTML entities
+                            valStr = valStr.replace(/&#43;/g, '+').replace(/&amp;/g, '&');
+                            
+                            if (!IGNORED_WIKI_KEYS.includes(key) && valStr !== '') {
+                                // Specific mapping for clarity if needed
+                                if (key === 'health regen') key = 'Health Regeneration';
+                                if (key === 'mana regen') key = 'Mana Regeneration';
+                                
+                                // Title Case for keys
+                                const properKey = key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                
+                                // Parse value
+                                let num = parseFloat(valStr.replace(/[^\d.-]/g, ''));
+                                
+                                if (valStr.includes('%') || valStr.includes('+') || valStr.includes('-')) {
+                                    stats[properKey] = valStr; // keep raw e.g. "+15.00%"
+                                } else if (!isNaN(num)) {
+                                    stats[properKey] = num;
+                                } else {
+                                    stats[properKey] = valStr; // keep as text if not numeric
+                                }
+                            }
+                        }
+                    }
+                    if (inInfobox && line.includes('}}')) inInfobox = false;
+                });
+                
+                return stats;
+            } catch (e) {
+                console.error("Failed to parse " + itemName, e);
+                return null;
+            }
+        }
+
+        document.getElementById('parseBtn').addEventListener('click', async () => {
+            const files = document.getElementById('fileInput').files;
+            if (files.length === 0) {
+                alert("Please select the HTML files first!");
+                return;
+            }
+
+            let allItems = [];
+            const outputEl = document.getElementById('output');
+            const progressCnt = document.getElementById('progressContainer');
+            const progressTxt = document.getElementById('progressText');
+            const progressFill = document.getElementById('progressBar');
+            const btn = document.getElementById('parseBtn');
+
+            outputEl.innerText = "Extracting names from HTML files...";
+            btn.disabled = true;
+            progressCnt.style.display = 'block';
+
+            // Phase 1: Local DOM Parsing
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const text = await file.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, "text/html");
+                
+                let type = 'Accessory';
+                if (file.name.toLowerCase().includes('armour')) type = 'Chest';
+                if (file.name.toLowerCase().includes('helmet')) type = 'Head';
+
+                const members = doc.querySelectorAll('.category-page__member');
+                members.forEach(member => {
+                    const link = member.querySelector('.category-page__member-link');
+                    const img = member.querySelector('.category-page__member-thumbnail'); 
+                    if (link) {
+                        const name = link.innerText.trim();
+                        let imgUrl = img && img.src ? cleanImageUrl(img.src) : '';
+                        
+                        allItems.push({
+                            id: name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(),
+                            type: type,
+                            name: name,
+                            imgUrl: imgUrl
+                        });
+                    }
+                });
+
+                const galleryItems = doc.querySelectorAll('.wikia-gallery-item');
+                galleryItems.forEach(item => {
+                    const titleEl = item.querySelector('.lightbox-caption') || item.querySelector('.thumbcaption') || item.querySelector('a');
+                    const imgEl = item.querySelector('img');
+                    if (titleEl && imgEl) {
+                        const name = titleEl.innerText.trim();
+                        let imgUrl = cleanImageUrl(imgEl.src);
+                        
+                        allItems.push({
+                            id: name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(),
+                            type: type,
+                            name: name,
+                            imgUrl: imgUrl
+                        });
+                    }
+                });
+            }
+
+            // Deduplicate
+            const uniqueItems = Array.from(new Map(allItems.map(item => [item.name, item])).values());
+            
+            // Phase 2: Remote Batch Scraping
+            outputEl.innerText = "Querying Fandom API for Stats...";
+            let processed = 0;
+            const batchedCount = 5; // To prevent Fandom API rate limits
+
+            for (let i = 0; i < uniqueItems.length; i += batchedCount) {
+                const batch = uniqueItems.slice(i, i + batchedCount);
+                
+                progressTxt.innerText = `Fetching ${i + 1}-${Math.min(i + batchedCount, uniqueItems.length)} of ${uniqueItems.length}: ${batch[0].name}...`;
+                
+                await Promise.all(batch.map(async (item) => {
+                    const apiStats = await fetchWikiStats(item.name);
+                    if (apiStats && Object.keys(apiStats).length > 0) {
+                        Object.assign(item, apiStats);
+                    } else {
+                        // Fallback safeguard to prevent broken UI
+                    }
+                    processed++;
+                    progressFill.style.width = `${(processed / uniqueItems.length) * 100}%`;
+                }));
+
+                // small wait to respect API boundaries
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            progressTxt.innerText = "Done!";
+            outputEl.innerText = JSON.stringify(uniqueItems, null, 4);
+            document.getElementById('copyBtn').style.display = 'block';
+            btn.disabled = false;
+        });
+    </script>
+</body>
+</html>

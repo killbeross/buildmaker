@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pilgrammed Build Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="wood-background"></div>
+    
+    <header class="app-header">
+        <div class="title-container">
+            <h1 class="oscillating-title">Pilgrammed</h1>
+            <div class="oscillation-arrow">⇐</div>
+        </div>
+        <nav class="top-nav">
+            <button class="nav-btn btn-purple" id="skillsNavBtn">Skills</button>
+            <button class="nav-btn btn-green" id="loadoutsNavBtn">Loadouts</button>
+            <button class="nav-btn btn-teal" id="findBuildNavBtn">Find a Build 🔍</button>
+        </nav>
+    </header>
+
+    <main class="app-wrapper">
+        <!-- Main Build View -->
+        <section id="appContainer" class="app-container">
+            <!-- Left Panel: Equipped Slots & Stats -->
+            <section class="left-panel">
+                <div class="equipped-area">
+                    <div class="slot-row top-row">
+                        <div class="slot large-slot empty" data-type="Head" data-slot-id="head"></div>
+                        <div class="slot large-slot empty" data-type="Chest" data-slot-id="chest"></div>
+                    </div>
+
+                    <div class="controls-row">
+                        <button class="sketch-btn btn-blue" id="bothHairsBtn">Both Hairs</button>
+                        <button class="sketch-btn btn-red" id="unequipAllBtn">Unequip All</button>
+                    </div>
+
+                    <div class="slot-row middle-row">
+                        <div class="slot empty" data-type="Accessory" data-slot-id="acc1"></div>
+                        <div class="slot empty" data-type="Accessory" data-slot-id="acc2"></div>
+                        <div class="slot empty" data-type="Accessory" data-slot-id="acc3"></div>
+                    </div>
+
+                    <div class="slot-row bottom-row">
+                        <div class="slot empty" data-type="Accessory" data-slot-id="acc4"></div>
+                        <div class="slot empty" data-type="Accessory" data-slot-id="acc5"></div>
+                    </div>
+                </div>
+
+                <!-- Stats Display -->
+                <div id="statsDisplay" class="stats-display">
+                    <div class="primary-stats">
+                        <div class="stat-group" data-stat="Strength">
+                            <span class="stat-label">Strength</span>
+                            <span class="stat-value" id="stat-strength">0</span>
+                        </div>
+                        <div class="stat-group" data-stat="Dexterity">
+                            <span class="stat-label">Dexterity</span>
+                            <span class="stat-value" id="stat-dexterity">0</span>
+                        </div>
+                        <div class="stat-group" data-stat="Defense">
+                            <span class="stat-label">Defense</span>
+                            <span class="stat-value" id="stat-defense">0</span>
+                        </div>
+                        <div class="stat-group" data-stat="Agility">
+                            <span class="stat-label">Agility</span>
+                            <span class="stat-value" id="stat-agility">0</span>
+                        </div>
+                        <div class="stat-group" data-stat="Intellect">
+                            <span class="stat-label">Intellect</span>
+                            <span class="stat-value" id="stat-intellect">0</span>
+                        </div>
+                        <div class="stat-group" data-stat="Crit Chance">
+                            <span class="stat-label">Crit Chance</span>
+                            <span class="stat-value" id="stat-crit-chance">0%</span>
+                        </div>
+                    </div>
+                    <div id="secondaryStats" class="secondary-stats"></div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Item Selection Grid -->
+            <section class="right-panel">
+                <div class="grid-container">
+                    <div id="itemGrid" class="item-grid split-grid"></div>
+                    <div class="hover-info" id="hoverInfo">
+                        Hover over an item to see its stats.
+                    </div>
+                    <div class="tab-controls">
+                        <button class="tab-btn btn-purple active" data-tab="Head">Helmets</button>
+                        <button class="tab-btn btn-green" data-tab="Chest">Armors</button>
+                        <button class="tab-btn btn-blue" data-tab="Accessory">Accessories</button>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <!-- Loadouts View -->
+        <section id="loadoutsView" class="loadouts-view hidden">
+            <div class="loadouts-header">
+                <button class="nav-btn btn-blue" onclick="switchView('build')">⇐ Back to Build</button>
+                <h2 class="fantasy-title">Loadouts</h2>
+                <button class="nav-btn btn-gold" onclick="uploadCurrentBuild()">⬆ Upload Build</button>
+            </div>
+            <div id="loadoutsGrid" class="loadouts-grid">
+                <!-- Javascript will populate loadouts here -->
+            </div>
+            <div class="pagination">
+                <button class="page-btn" onclick="handlePage(1)">Page 1</button>
+                <button class="page-btn" onclick="handlePage(2)">Page 2</button>
+                <button class="page-btn" onclick="handlePage(3)">Page 3</button>
+            </div>
+        </section>
+
+        <!-- Community Builds View -->
+        <section id="communityView" class="community-view hidden">
+            <div class="community-header">
+                <button class="nav-btn btn-blue" onclick="switchView('build')">⇐ Back to Build</button>
+                <h2 class="fantasy-title">Community Builds</h2>
+                <div class="community-filters">
+                    <button class="filter-btn active" data-sort="popular">Most Popular</button>
+                    <button class="filter-btn" data-sort="newest">Newest</button>
+                </div>
+            </div>
+            <div id="communityGrid" class="community-grid">
+                <!-- Javascript will populate community builds here -->
+            </div>
+        </section>
+
+
+    </main>
+
+    <footer class="app-footer">
+        <div class="version-tag">version sol</div>
+        <div class="music-player" id="musicPlayer">
+            <span class="music-icon">🎵</span>
+            <span class="music-text" id="musicText">Playing: Sweet Jomes</span>
+            <!-- Hidden SoundCloud Widget -->
+            <iframe id="sc-widget" width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" 
+                src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/bonzods/sweet-jomes&color=%23ff5500&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false" 
+                style="display:none;">
+            </iframe>
+        </div>
+    </footer>
+
+    <!-- SoundCloud Widget API -->
+    <script src="https://w.soundcloud.com/player/api.js" type="text/javascript"></script>
+    <script src="items.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
